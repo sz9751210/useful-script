@@ -29,7 +29,7 @@ git_prompt() {
 }
 
 # 定義 Bash 提示符
-export PS1='\[\e[1;33m\]\w\[\e[m\] \[\e[1;32m\]$(git_prompt)\[\e[m\]\$ '
+export PS1="\[\e[1;33m\]\w\[\e[m\] \[\e[1;32m\]\$(git_prompt)\[\e[m\]\$ "
 ' >> $BASHRC
 
 # 添加一些有用的別名
@@ -44,7 +44,7 @@ alias free="free -m"
 # 添加命令執行時間提示
 echo '
 # 顯示上一個命令的執行時間
-export PROMPT_COMMAND="RETRN_VAL=$?;echo -n [\$(date +%d-%m-%Y\ %T)] ; if [ \$RETRN_VAL -ne 0 ]; then echo -ne \"\[\033[01;31m\](\$RETRN_VAL) \[\033[0m\]\"; fi"
+export PROMPT_COMMAND="RETRN_VAL=$?;echo -n [\$(date +%Y-%m-%d\ %T)] ; if [ \$RETRN_VAL -ne 0 ]; then echo -ne \"\[\033[01;31m\](\$RETRN_VAL) \[\033[0m\]\"; fi"
 ' >> $BASHRC
 
 # 載入新的配置
