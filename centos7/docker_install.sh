@@ -23,6 +23,7 @@ sudo usermod -aG docker $(whoami)
 # 注意：請檢查 https://github.com/docker/compose/releases 以獲取最新版本
 sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
 # 輸出版本以確認安裝成功
 docker --version
