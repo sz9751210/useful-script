@@ -1,0 +1,6 @@
+#!/bin/bash
+
+export CLUSTER_NAME_ENV="eks"
+export REGION_ENV="ap-east-1"
+export VPC_NAME_ENV="vpc"
+export EFS_NAME_ENV="efs"
