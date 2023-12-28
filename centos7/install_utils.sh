@@ -14,6 +14,8 @@ sudo yum install telnet -y
 
 sudo yum install make -y
 
+sudo yum install unzip -y
+
 # Check the installations
 echo "Installed versions:"
 curl --version | head -1
