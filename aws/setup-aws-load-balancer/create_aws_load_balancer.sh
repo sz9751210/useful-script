@@ -39,6 +39,9 @@ if [ -z "$VPC_ID" ]; then
     exit 1
 fi
 
+# 創建服務帳戶
+envsubst < sa.yaml | kubectl apply -f -
+
 # 向 Helm 添加 EKS 存儲庫
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update
