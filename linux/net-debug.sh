@@ -23,3 +23,4 @@ select container in $containers; do
 done
 
 docker run -it --net container:$container_name nicolaka/netshoot
+### usage : https://blog.haohtml.com/archives/19080
