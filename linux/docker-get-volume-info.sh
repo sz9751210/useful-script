@@ -4,22 +4,26 @@
 get_volume_info() {
     volume_name=$1
 
-    # Get volume size by running a temporary Alpine container
+    # Get volume size
     volume_size=$(docker run --rm -v ${volume_name}:/volume_data alpine sh -c "du -sh /volume_data | cut -f1")
 
     # Get connected containers
     connected_containers=$(docker ps --filter volume=$volume_name --format "{{.Names}}")
 
-    # Fallback message if no containers are connected
-    if [ -z "$connected_containers" ]; then
-        connected_containers="None"
-    fi
+    # Inspect volume for additional details
+    volume_inspection=$(docker volume inspect $volume_name)
+    volume_driver=$(echo "$volume_inspection" | jq -r '.[0].Driver')
+    volume_mountpoint=$(echo "$volume_inspection" | jq -r '.[0].Mountpoint')
 
-    # Display information
-    echo "Volume Name: $volume_name"
-    echo "Volume Size: $volume_size"
-    echo "Connected Containers: $connected_containers"
-    echo "-------------------------"
+    # Approximate volume creation date
+    volume_creation_date=$(stat -c %y "$volume_mountpoint" 2>/dev/null | cut -d' ' -f1)
+
+    # Fallback messages
+    [ -z "$connected_containers" ] && connected_containers="None"
+    [ -z "$volume_creation_date" ] && volume_creation_date="Unknown"
+
+    # Prepare tab-delimited output
+    echo -e "$volume_name\t$volume_size\t$connected_containers\t$volume_driver\t$volume_creation_date"
 }
 
 # Check if Docker is running
@@ -28,7 +32,16 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# List all Docker volumes and iterate over each volume
+# Check for jq
+if ! command -v jq > /dev/null 2>&1; then
+    echo "jq is not installed. Please install jq and try again."
+    exit 1
+fi
+
+echo -e "Volume Name\tVolume Size\tConnected Containers\tVolume Driver\tCreation Date"
+echo "-----------------------------------------------------------------------------------"
+
+# List all Docker volumes, get details, and format output
 docker volume ls -q | while read volume; do
     get_volume_info "$volume"
-done
+done | column -t -s $'\t'
