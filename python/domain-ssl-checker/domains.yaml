@@ -1,0 +1,6 @@
+doamin_envs:
+  normal:
+    - google.com
+    - www.yahoo.com
+  knowledge:
+    - wikipedia.org
