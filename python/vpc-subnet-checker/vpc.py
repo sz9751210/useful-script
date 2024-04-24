@@ -30,9 +30,14 @@ def list_vpcs_and_subnets_for_projects(project_ids):
         print(subnets_result.stdout)
 
 
-def check_ip_in_subnets(project_ids, ip_to_check):
+def check_subnet_coverage(project_ids, cidr_to_check):
+    try:
+        network_to_check = ipaddress.ip_network(cidr_to_check)
+    except ValueError:
+        print("無效的 CIDR 範圍。請輸入正確的 CIDR 格式，例如 '192.168.1.0/24'。")
+        return
+
     found = False
-    ip = ipaddress.ip_address(ip_to_check)
     for project_id in project_ids:
         subprocess.run(
             ["gcloud", "config", "set", "project", project_id],
@@ -52,25 +57,24 @@ def check_ip_in_subnets(project_ids, ip_to_check):
             subnet_name = subnet["name"]
             vpc_name = subnet["network"].split("/")[-1]
             subnet_range = subnet["ipCidrRange"]
-            if ip in ipaddress.ip_network(subnet_range):
+            subnet_network = ipaddress.ip_network(subnet_range)
+
+            if network_to_check.overlaps(subnet_network):
                 print(
-                    f"IP地址 {ip_to_check} 被使用在專案 {project_id} 中的 VPC {vpc_name}，子網名稱為 {subnet_name}，IP範圍是 {subnet_range}。"
+                    f"CIDR 範圍 {cidr_to_check} 與專案 {project_id} 中的 VPC {vpc_name}，子網 {subnet_name} （IP範圍 {subnet_range}）有交集。"
                 )
                 found = True
 
     if not found:
-        print(f"IP地址 {ip_to_check} 在所有列出的專案子網中未被使用。")
+        print(f"CIDR 範圍 {cidr_to_check} 在所有列出的專案子網中未被使用。")
 
 
 def main():
-    project_ids = [
-        "project-1",
-        "project-2",
-    ]
+    project_ids = ["project-1" "project-2"]
     while True:
         print("\n功能選單:")
         print("1. 列出專案的所有子網")
-        print("2. 檢查IP是否在子網中被使用")
+        print("2. 檢查 IP 或 CIDR 是否在子網中被使用")
         print("q. 退出程序")
         choice = input("請輸入選項（1, 2, 或 'q' 退出）：")
 
@@ -78,8 +82,8 @@ def main():
             print("開始檢查 IP 地址...")
             list_vpcs_and_subnets_for_projects(project_ids)
         elif choice == "2":
-            ip_input = input("請輸入 IP 地址進行檢查：")
-            check_ip_in_subnets(project_ids, ip_input)
+            ip_input = input("請輸入 IP 地址或 CIDR 範圍進行檢查：")
+            check_subnet_coverage(project_ids, ip_input)
         elif choice == "q":
             print("正在退出程序...")
             break
