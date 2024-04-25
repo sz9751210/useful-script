@@ -3,70 +3,84 @@ import ipaddress
 import json
 
 
+def set_project(project_id):
+    subprocess.run(
+        ["gcloud", "config", "set", "project", project_id],
+        check=True,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def run_gcloud_command(args, output_format="json"):
+    result = subprocess.run(
+        args + ["--format", output_format], capture_output=True, text=True, check=True
+    )
+    if output_format == "json":
+        return json.loads(result.stdout)
+    return result.stdout
+
+
 def list_vpcs_and_subnets_for_projects(project_ids):
     for project_id in project_ids:
-        subprocess.run(
-            ["gcloud", "config", "set", "project", project_id],
-            check=True,
-            stderr=subprocess.DEVNULL,
+        set_project(project_id)
+        print(f"列出專案 {project_id} 下的所有 VPC 網路和子網路：\n" + "-" * 70)
+        subnets_result = run_gcloud_command(
+            ["gcloud", "compute", "networks", "subnets", "list"],
+            output_format="table(network.basename():label=VPC網路, name:label=名稱, region.basename():label=區域, ipCidrRange:label=IPv4範圍)",
         )
-
-        print(f"列出專案 {project_id} 下的所有 VPC 網路和子網路：")
-        print("-" * 70)
-
-        subnets_result = subprocess.run(
-            [
-                "gcloud",
-                "compute",
-                "networks",
-                "subnets",
-                "list",
-                "--format=table(network.basename():label=VPC網路, name:label=名稱, region.basename():label=區域, ipCidrRange:label=IPv4範圍)",
-            ],
-            text=True,
-            check=True,
-            stdout=subprocess.PIPE,
-        )
-        print(subnets_result.stdout)
+        print(subnets_result)
 
 
-def check_subnet_coverage(project_ids, cidr_to_check):
+def find_relative_subnets(project_ids, cidr_to_check):
     try:
-        network_to_check = ipaddress.ip_network(cidr_to_check)
+        target_network = ipaddress.ip_network(cidr_to_check)
     except ValueError:
-        print("無效的 CIDR 範圍。請輸入正確的 CIDR 格式，例如 '192.168.1.0/24'。")
+        print("無效的 CIDR 範圍。請輸入正確的 CIDR 格式。")
         return
 
-    found = False
     for project_id in project_ids:
-        subprocess.run(
-            ["gcloud", "config", "set", "project", project_id],
-            check=True,
-            stderr=subprocess.DEVNULL,
+        set_project(project_id)
+        subnets = run_gcloud_command(
+            ["gcloud", "compute", "networks", "subnets", "list"]
         )
 
-        subnets_result = subprocess.run(
-            ["gcloud", "compute", "networks", "subnets", "list", "--format=json"],
-            capture_output=True,
-            text=True,
-            check=True,
+        closest_smaller, closest_larger = get_closest_subnets(subnets, target_network)
+
+        print_relative_subnets(
+            project_id, cidr_to_check, closest_smaller, closest_larger
         )
-        subnets = json.loads(subnets_result.stdout)
 
-        for subnet in subnets:
-            subnet_name = subnet["name"]
-            vpc_name = subnet["network"].split("/")[-1]
-            subnet_range = subnet["ipCidrRange"]
-            subnet_network = ipaddress.ip_network(subnet_range)
 
-            if network_to_check.overlaps(subnet_network):
-                print(
-                    f"CIDR 範圍 {cidr_to_check} 與專案 {project_id} 中的 VPC {vpc_name}，子網 {subnet_name} （IP範圍 {subnet_range}）有交集。"
-                )
-                found = True
+def get_closest_subnets(subnets, target_network):
+    closest_smaller = closest_larger = None
+    min_diff_smaller = min_diff_larger = float("inf")
 
-    if not found:
-        print(f"CIDR 範圍 {cidr_to_check} 在所有列出的專案子網中未被使用。")
+    for subnet in subnets:
+        subnet_network = ipaddress.ip_network(subnet["ipCidrRange"])
+        diff = int(subnet_network.network_address) - int(target_network.network_address)
+
+        if subnet_network < target_network and abs(diff) < min_diff_smaller:
+            min_diff_smaller, closest_smaller = abs(diff), subnet
+        elif subnet_network > target_network and abs(diff) < min_diff_larger:
+            min_diff_larger, closest_larger = abs(diff), subnet
+
+    return closest_smaller, closest_larger
+
+
+def print_relative_subnets(project_id, cidr_to_check, closest_smaller, closest_larger):
+    if closest_smaller:
+        print(
+            f"專案 {project_id} 中最接近但小於 {cidr_to_check} 的網段是：{closest_smaller['name']} ({closest_smaller['ipCidrRange']})"
+        )
+    else:
+        print(f"專案 {project_id} 中沒有小於 {cidr_to_check} 的網段。")
+
+    if closest_larger:
+        print(
+            f"專案 {project_id} 中最接近但大於 {cidr_to_check} 的網段是：{closest_larger['name']} ({closest_larger['ipCidrRange']})"
+        )
+    else:
+        print(f"專案 {project_id} 中沒有大於 {cidr_to_check} 的網段。")
 
 
 def main():
@@ -83,7 +97,7 @@ def main():
             list_vpcs_and_subnets_for_projects(project_ids)
         elif choice == "2":
             ip_input = input("請輸入 IP 地址或 CIDR 範圍進行檢查：")
-            check_subnet_coverage(project_ids, ip_input)
+            find_relative_subnets(project_ids, ip_input)
         elif choice == "q":
             print("正在退出程序...")
             break
